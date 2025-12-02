@@ -43,3 +43,23 @@ model SaleItem {
   quantity  Int
   price     Float
 }
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String   // Will store the HASH, not real password
+  name      String
+  role      String   // "ADMIN" or "PHARMACIST"
+  createdAt DateTime @default(now())
+  attendance Attendance[]
+  
+  // Relations (We will add Sales later)
+}
+
+model Attendance {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  checkIn   DateTime  @default(now())
+  checkOut  DateTime? // Null means "Currently Working"
+}

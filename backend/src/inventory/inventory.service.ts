@@ -3,8 +3,68 @@ import { PrismaService } from '../prisma.service'; // Use the injected service
 
 @Injectable()
 export class InventoryService {
+
+  // Get Sales for the last 7 days
+  async getWeeklyStats() {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const sales = await this.prisma.sale.findMany({
+      where: {
+        createdAt: {
+          gte: sevenDaysAgo,
+        },
+      },
+      include: { items: true },
+    });
+
+    // Group by Day (Simple Aggregation)
+    const stats: Record<string, number> = {};
+    
+    // Initialize last 7 days with 0
+    for(let i=0; i<7; i++) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toISOString().split('T')[0]; // "2023-10-25"
+        stats[dateStr] = 0;
+    }
+
+    // Fill in real data
+    sales.forEach(sale => {
+      const dateStr = sale.createdAt.toISOString().split('T')[0];
+      // Since we didn't save price in Sale model, we count Quantity sold
+      const totalQty = sale.items.reduce((sum, item) => sum + item.quantity, 0);
+      
+      if (stats[dateStr] !== undefined) {
+        stats[dateStr] += totalQty;
+      }
+    });
+
+    // Convert to Array for Recharts
+    return Object.entries(stats)
+      .map(([date, total]) => ({ date, total }))
+      .sort((a, b) => a.date.localeCompare(b.date)); // Sort Oldest -> Newest
+  }
+  
   // Inject the database service
   constructor(private prisma: PrismaService) {}
+  
+  // Get recent sales history
+  async getSalesHistory() {
+    return await this.prisma.sale.findMany({
+      take: 20, // Limit to last 20 records
+      orderBy: { createdAt: 'desc' }, // Newest first
+      include: {
+        items: {
+          include: {
+            batch: {
+              include: { product: true } // We need the product name!
+            }
+          }
+        }
+      }
+    });
+  }
 
   async addBatch(productId: string, batchNumber: string, expiryDate: string, quantity: number) {
     return await this.prisma.batch.create({
