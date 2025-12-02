@@ -1,0 +1,45 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = "postgresql://admin:rootpassword@localhost:5432/pharmacydb?schema=public"
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  sku         String   @unique
+  minStock    Int      @default(10)
+  batches     Batch[]
+  createdAt   DateTime @default(now())
+}
+
+model Batch {
+  id          String   @id @default(uuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  batchNumber String
+  quantity    Int
+  expiryDate  DateTime
+  receivedAt  DateTime @default(now())
+  saleItems   SaleItem[]
+}
+
+model Sale {
+  id          String     @id @default(uuid())
+  totalAmount Float
+  createdAt   DateTime   @default(now())
+  items       SaleItem[]
+}
+
+model SaleItem {
+  id        String   @id @default(uuid())
+  saleId    String
+  sale      Sale     @relation(fields: [saleId], references: [id])
+  batchId   String
+  batch     Batch    @relation(fields: [batchId], references: [id])
+  quantity  Int
+  price     Float
+}
