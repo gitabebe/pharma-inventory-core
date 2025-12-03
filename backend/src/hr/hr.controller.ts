@@ -1,30 +1,26 @@
-import { Controller, Post, Get, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, UseGuards, Request } from '@nestjs/common';
 import { HrService } from './hr.service';
 import { AuthGuard } from '@nestjs/passport';
+import { PrismaService } from '../prisma.service';
 
 @Controller('hr')
 export class HrController {
-  constructor(private readonly hrService: HrService) {}
+  constructor(private hrService: HrService, private prisma: PrismaService) {}
 
-  // Get User's Status
   @UseGuards(AuthGuard('jwt'))
-  @Get('status')
-  async getStatus(@Request() req: any) {
-    // The "req.user" comes from the JWT Token we built earlier
-    return this.hrService.getStatus(req.user.userId);
-  }
+  @Get('performance')
+  async getPerformance(@Request() req: any) {
+    const role = req.user.role;
+    const myId = req.user.userId;
 
-  // Clock In
-  @UseGuards(AuthGuard('jwt'))
-  @Post('clock-in')
-  async clockIn(@Request() req: any) {
-    return this.hrService.clockIn(req.user.userId);
-  }
-
-  // Clock Out
-  @UseGuards(AuthGuard('jwt'))
-  @Post('clock-out')
-  async clockOut(@Request() req: any) {
-    return this.hrService.clockOut(req.user.userId);
+    // RULE: HR sees everyone. Everyone else sees ONLY themselves.
+    if (role === 'HR_MANAGER') {
+      return this.hrService.getPerformanceStats(); // Returns full list
+    } else {
+      // Filter the list to show only the logged-in user
+      const allStats = await this.hrService.getPerformanceStats();
+      const myStats = allStats.filter(stat => stat.email === req.user.email);
+      return myStats;
+    }
   }
 }

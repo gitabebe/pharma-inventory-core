@@ -4,34 +4,104 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = "postgresql://admin:rootpassword@localhost:5432/pharmacydb?schema=public"
+  url      = env("DATABASE_URL")
+}
+
+// --- 1. PEOPLE & SECURITY ---
+
+enum Role {
+  SUPER_ADMIN
+  HR_MANAGER
+  STORE_MANAGER
+  PHARMACIST
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(PHARMACIST)
+  
+  // New: Status Flag
+  isActive  Boolean  @default(true) // <--- ADD THIS LINE
+
+  // HR Data
+  baseSalary Decimal? @db.Decimal(10, 2)
+  joinDate   DateTime @default(now())
+  
+  // Relations
+  sales        Sale[]
+  requests     StockRequest[]
+  auditLogs    AuditLog[]
+  attendance   Attendance[]
+  
+  createdAt DateTime @default(now())
+}
+
+model Attendance {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  checkIn   DateTime  @default(now())
+  checkOut  DateTime?
+}
+
+// --- 2. INVENTORY & SUPPLY CHAIN ---
+
+model Location {
+  id      String   @id @default(uuid())
+  name    String   
+  type    String   // "WAREHOUSE", "STORE"
+  batches Batch[]
 }
 
 model Product {
   id          String   @id @default(uuid())
   name        String
   sku         String   @unique
+  description String?
   minStock    Int      @default(10)
+  
   batches     Batch[]
-  createdAt   DateTime @default(now())
+  requests    StockRequest[] // <--- THIS WAS MISSING
 }
 
 model Batch {
   id          String   @id @default(uuid())
+  batchNumber String
   productId   String
   product     Product  @relation(fields: [productId], references: [id])
-  batchNumber String
+  locationId  String
+  location    Location @relation(fields: [locationId], references: [id])
   quantity    Int
   expiryDate  DateTime
-  receivedAt  DateTime @default(now())
+  costPrice   Decimal  @default(0)
   saleItems   SaleItem[]
 }
 
+// --- 3. WORKFLOW: REQUESTS ---
+
+model StockRequest {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  quantity  Int
+  status    String   @default("PENDING")
+  requestedById String
+  requestedBy   User   @relation(fields: [requestedById], references: [id])
+  createdAt DateTime @default(now())
+}
+
+// --- 4. SALES & FINANCE ---
+
 model Sale {
   id          String     @id @default(uuid())
-  totalAmount Float
-  createdAt   DateTime   @default(now())
+  totalAmount Decimal    @db.Decimal(10, 2)
+  userId      String
+  user        User       @relation(fields: [userId], references: [id])
   items       SaleItem[]
+  createdAt   DateTime   @default(now())
 }
 
 model SaleItem {
@@ -41,25 +111,13 @@ model SaleItem {
   batchId   String
   batch     Batch    @relation(fields: [batchId], references: [id])
   quantity  Int
-  price     Float
+  price     Decimal  @db.Decimal(10, 2)
 }
 
-model User {
+model AuditLog {
   id        String   @id @default(uuid())
-  email     String   @unique
-  password  String   // Will store the HASH, not real password
-  name      String
-  role      String   // "ADMIN" or "PHARMACIST"
-  createdAt DateTime @default(now())
-  attendance Attendance[]
-  
-  // Relations (We will add Sales later)
-}
-
-model Attendance {
-  id        String    @id @default(uuid())
+  action    String
   userId    String
-  user      User      @relation(fields: [userId], references: [id])
-  checkIn   DateTime  @default(now())
-  checkOut  DateTime? // Null means "Currently Working"
+  user      User     @relation(fields: [userId], references: [id])
+  timestamp DateTime @default(now())
 }

@@ -1,43 +1,51 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const adminEmail = 'admin@pharmacy.com';
+  // 1. Locations
+  const warehouse = await prisma.location.create({ data: { name: 'Central Warehouse', type: 'WAREHOUSE' } });
+  const shop = await prisma.location.create({ data: { name: 'Shop Floor', type: 'STORE' } });
 
-  // 1. Check if admin already exists
-  const existingAdmin = await prisma.user.findUnique({
-    where: { email: adminEmail },
+  // 2. Users (The 4 Roles)
+  const hash = await bcrypt.hash('123456', 10);
+
+  // ADMIN (IT)
+  await prisma.user.create({
+    data: { email: 'admin@pharmacy.com', name: 'IT Admin', password: hash, role: Role.SUPER_ADMIN, baseSalary: 0 }
   });
 
-  if (existingAdmin) {
-    console.log('Admin user already exists.');
-    return;
-  }
+  // HR (People)
+  await prisma.user.create({
+    data: { email: 'hr@pharmacy.com', name: 'Sarah HR', password: hash, role: Role.HR_MANAGER, baseSalary: 5000 }
+  });
 
-  // 2. Hash the password (The most important step!)
-  // "10" is the salt rounds (complexity)
-  const hashedPassword = await bcrypt.hash('admin123', 10);
+  // STORE (Ops)
+  await prisma.user.create({
+    data: { email: 'store@pharmacy.com', name: 'Mike Store', password: hash, role: Role.STORE_MANAGER, baseSalary: 4000 }
+  });
 
-  // 3. Create the user
-  const admin = await prisma.user.create({
+  // PHARMACIST (Sales)
+  await prisma.user.create({
+    data: { email: 'pharm@pharmacy.com', name: 'John Doe', password: hash, role: Role.PHARMACIST, baseSalary: 3500 }
+  });
+
+  // 3. Initial Product
+  const product = await prisma.product.create({
     data: {
-      email: adminEmail,
-      name: 'System Admin',
-      password: hashedPassword, // Store the hash, NOT 'admin123'
-      role: 'ADMIN',
-    },
+      name: 'Amoxicillin 500mg', sku: 'AMOX-500', minStock: 50,
+      batches: {
+        create: {
+          batchNumber: 'INIT-BATCH', expiryDate: new Date('2026-12-31'), quantity: 200, costPrice: 5.00, locationId: warehouse.id
+        }
+      }
+    }
   });
 
-  console.log('Created Admin User:', admin);
+  console.log('✅ Database Seeding Complete. All passwords are "123456"');
 }
 
 main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+  .catch((e) => console.error(e))
+  .finally(async () => await prisma.$disconnect());

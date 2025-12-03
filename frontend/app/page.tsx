@@ -1,398 +1,353 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Fragment } from "react"; // <--- ADDED FRAGMENT
 import axios from "axios";
 import { useRouter } from "next/navigation"; 
 import { 
-  Package, ShoppingCart, RefreshCw, Activity, CheckCircle2, History, LogOut, AlertCircle, PlayCircle, StopCircle, PlusCircle, FileText
+  LogOut, Truck, Store, Users, UserPlus, Trophy, ShoppingCart, RefreshCw, Trash2, Search, User as UserIcon, XCircle, CheckCircle, ArrowRight, Eye, Plus, Minus, Edit2
 } from "lucide-react";
-// Import Recharts
-import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
-// --- Types ---
-interface Batch { id: string; batchNumber: string; quantity: number; expiryDate: string; }
+// --- TYPES ---
+interface Batch { id: string; batchNumber: string; quantity: number; expiryDate: string; costPrice: number; location: { type: string }; }
 interface Product { id: string; name: string; sku: string; batches: Batch[]; }
-interface SaleLog { 
-  id: string; totalAmount: number; createdAt: string; 
-  items: { quantity: number; batch: { batchNumber: string; product: { name: string } } }[] 
-}
-interface HrStatus { isWorking: boolean; session?: { checkIn: string } }
+interface User { name: string; role: string; email: string; }
+interface Employee { id: string; name: string; role: string; email: string; baseSalary?: number; isActive: boolean; }
+interface Performer { name: string; totalSales: number; email: string; }
+interface CartItem { sku: string; name: string; qty: number; }
+interface MyProfile { name: string; email: string; role: string; baseSalary: number; joinDate: string; }
 
-export default function Dashboard() {
+export default function EnterpriseERP() {
+  const [user, setUser] = useState<User | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
-  const [logs, setLogs] = useState<SaleLog[]>([]);
-  const [stats, setStats] = useState<{date: string, total: number}[]>([]); 
-  const [loading, setLoading] = useState(true);
-  const [sellQty, setSellQty] = useState<Record<string, string>>({});
-  const [processing, setProcessing] = useState(false);
-  const [downloading, setDownloading] = useState(false); // New state for PDF button
+  const [employees, setEmployees] = useState<Employee[]>([]); 
+  const [performers, setPerformers] = useState<Performer[]>([]);
   
-  // HR State
-  const [hrStatus, setHrStatus] = useState<HrStatus>({ isWorking: false });
-  const [hrLoading, setHrLoading] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [myProfileData, setMyProfileData] = useState<MyProfile | null>(null);
+  const [expandedProduct, setExpandedProduct] = useState<string | null>(null);
+  
+  // Carts
+  const [cart, setCart] = useState<CartItem[]>([]); 
+  const [transferCart, setTransferCart] = useState<CartItem[]>([]); 
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // Forms
+  const [empData, setEmpData] = useState({ name: "", email: "", pass: "", role: "PHARMACIST", salary: "0" });
+  const [isEditingEmp, setIsEditingEmp] = useState<string | null>(null); 
+  
+  const [receiveData, setReceiveData] = useState({ sku: "", batch: "", expiry: "", qty: "", cost: "" });
+  const [prodData, setProdData] = useState({ name: "", sku: "", min: "10" });
+  const [transferInputs, setTransferInputs] = useState<Record<string, string>>({});
 
   const router = useRouter();
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
-  // --- 1. Load Data ---
   useEffect(() => {
     const token = localStorage.getItem("token");
-    if (!token) {
-      router.push("/login");
-    } else {
-      fetchInventory();
-      fetchHistory();
-      fetchHrStatus();
-      fetchStats(); 
+    const role = localStorage.getItem("user_role");
+    if (!token) { router.push("/login"); } 
+    else {
+      setUser({ name: "User", role: role || "PHARMACIST", email: "me@pharmacy.com" });
+      loadData(role);
     }
   }, []);
 
-  const getAuthHeader = () => {
-    const token = localStorage.getItem("token");
-    return { headers: { Authorization: `Bearer ${token}` } };
+  const getHeader = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
+
+  const loadData = (role: string | null) => {
+    if(role !== 'SUPER_ADMIN' && role !== 'HR_MANAGER') { axios.get(`${API_URL}/inventory`).then(res => setProducts(res.data)); }
+    if(role !== 'PHARMACIST') { axios.get(`${API_URL}/auth/employees`, getHeader()).then(res => setEmployees(res.data)); }
+    axios.get(`${API_URL}/hr/performance`, getHeader()).then(res => setPerformers(res.data));
   };
 
-  const fetchInventory = async () => {
+  const fetchMyProfile = async () => {
     try {
-      const response = await axios.get(`${API_URL}/inventory`);
-      if (Array.isArray(response.data)) setProducts(response.data);
-      setLoading(false);
-    } catch (error) { console.error("Inventory error:", error); setLoading(false); }
+      const res = await axios.get(`${API_URL}/auth/me`, getHeader());
+      setMyProfileData(res.data);
+      setShowProfile(true);
+    } catch(e) { alert("Could not load profile. Check backend logs."); }
   };
 
-  const fetchHistory = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      if (!token) return;
-      const response = await axios.get(`${API_URL}/inventory/history`, getAuthHeader());
-      setLogs(response.data);
-    } catch (error) { console.error("History error:", error); }
+  const getStock = (p: Product, locationType: 'STORE' | 'WAREHOUSE') => {
+    return p.batches.filter(b => b.location.type === locationType).reduce((sum, b) => sum + b.quantity, 0);
   };
 
-  const fetchStats = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      if (!token) return;
-      const response = await axios.get(`${API_URL}/inventory/stats`, getAuthHeader());
-      setStats(response.data);
-    } catch (error) { console.error("Stats error:", error); }
+  // --- ACTIONS ---
+  const handleCreateProduct = async () => {
+    try { await axios.post(`${API_URL}/inventory/product`, { name: prodData.name, sku: prodData.sku, minStock: parseInt(prodData.min) }, getHeader()); alert("Created!"); loadData(user?.role||""); } catch (e) { alert("Error"); }
   };
-
-  // --- HR Functions ---
-  const fetchHrStatus = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      if (!token) return;
-      const response = await axios.get(`${API_URL}/hr/status`, getAuthHeader());
-      setHrStatus(response.data);
-    } catch (error) { console.error("HR Status Error", error); }
+  const receiveStock = async () => {
+     try {
+       const prod = products.find(p => p.sku === receiveData.sku);
+       if (!prod) { alert("Product not found"); return; }
+       await axios.post(`${API_URL}/inventory/batch`, { productId: prod.id, batchNumber: receiveData.batch, expiry: receiveData.expiry, qty: parseInt(receiveData.qty), cost: parseFloat(receiveData.cost) }, getHeader());
+       alert("Received!"); loadData(user?.role||"");
+     } catch(e) { alert("Failed"); }
   }
-
-  const toggleShift = async () => {
-    setHrLoading(true);
-    try {
-      const endpoint = hrStatus.isWorking ? "clock-out" : "clock-in";
-      await axios.post(`${API_URL}/hr/${endpoint}`, {}, getAuthHeader());
-      await fetchHrStatus();
-      alert(hrStatus.isWorking ? "Shift Ended. Goodbye!" : "Shift Started. Welcome!");
-    } catch (error: any) {
-      alert("Error: " + (error.response?.data?.message || "HR Action Failed"));
-    } finally {
-      setHrLoading(false);
-    }
-  }
-
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    router.push("/login");
-  };
-
-  // --- Quick Restock Function ---
-  const handleRestock = async (productId: string) => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
-    const qtyStr = prompt("How many units to add?", "50");
-    if (!qtyStr) return;
-    const qty = parseInt(qtyStr);
-
-    try {
-      await axios.post(`${API_URL}/inventory/batch`, {
-        productId: productId,
-        batchNumber: "BATCH-" + Math.floor(Math.random() * 10000), 
-        expiry: "2026-06-01", 
-        qty: qty 
-      }, getAuthHeader());
-      
-      alert(`Restocked ${qty} units!`);
-      fetchInventory(); 
-    } catch (error) {
-      console.error(error);
-      alert("Restock failed");
-    }
-  };
-
-  // --- NEW: Download PDF Report ---
-  const handleDownloadReport = async () => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-    setDownloading(true);
-
-    try {
-      // 1. Request the PDF as a Blob (Binary Data)
-      const response = await axios.get(`${API_URL}/inventory/report`, {
-        headers: { Authorization: `Bearer ${token}` },
-        responseType: 'blob', // IMPORTANT: Tells Axios this is a file, not JSON
-      });
-
-      // 2. Create a hidden link to trigger the download
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', 'pharmacore-report.pdf'); // Filename
-      document.body.appendChild(link);
-      link.click();
-      
-      // 3. Cleanup
-      link.remove();
-    } catch (error) {
-      console.error("Download failed", error);
-      alert("Failed to download report");
-    } finally {
-      setDownloading(false);
-    }
-  };
-
-  const handleSell = async (sku: string, productName: string) => {
-    const qty = parseInt(sellQty[sku]);
+  const addToTransferCart = (p: Product) => {
+    const qty = parseInt(transferInputs[p.sku]);
     if (!qty || qty <= 0) return;
-    setProcessing(true);
+    const existing = transferCart.find(c => c.sku === p.sku);
+    if(existing) { setTransferCart(transferCart.map(c => c.sku === p.sku ? {...c, qty: c.qty + qty} : c)); } 
+    else { setTransferCart([...transferCart, { sku: p.sku, name: p.name, qty: qty }]); }
+    setTransferInputs({...transferInputs, [p.sku]: ""});
+  };
+  const confirmTransfer = async () => {
+    try { for (const item of transferCart) { await axios.post(`${API_URL}/inventory/transfer`, { sku: item.sku, qty: item.qty }, getHeader()); } alert("Transferred!"); setTransferCart([]); loadData(user?.role||""); } catch(e) { alert("Failed"); }
+  }
+  
+  // --- HR ACTIONS ---
+  const saveEmployee = async () => {
     try {
-      await axios.post(`${API_URL}/inventory/sell`, { sku, qty }, getAuthHeader());
-      setSellQty({ ...sellQty, [sku]: "" });
-      fetchInventory(); 
-      fetchHistory();
-      fetchStats();
-    } catch (error: any) {
-      if (error.response?.status === 401) { alert("Session expired."); handleLogout(); }
-      else { alert("Error: " + (error.response?.data?.message || "Sale failed")); }
-    } finally { setProcessing(false); }
+      if (isEditingEmp) {
+        await axios.patch(`${API_URL}/auth/users/${isEditingEmp}`, { role: empData.role, salary: parseFloat(empData.salary) }, getHeader());
+        alert("Updated!"); setIsEditingEmp(null);
+      } else {
+        await axios.post(`${API_URL}/auth/register`, { name: empData.name, email: empData.email, pass: empData.pass, role: empData.role, baseSalary: parseFloat(empData.salary) }, getHeader());
+        alert("Hired!");
+      }
+      setEmpData({ name: "", email: "", pass: "", role: "PHARMACIST", salary: "0" });
+      loadData(user?.role || "");
+    } catch (e) { alert("Operation Failed"); }
   };
 
-  const getExpiryStatus = (dateString: string) => {
-    const date = new Date(dateString);
-    const today = new Date();
-    const threeMonthsFromNow = new Date();
-    threeMonthsFromNow.setMonth(today.getMonth() + 3);
-    if (date < today) return { color: "text-red-600 bg-red-50", label: "EXPIRED" };
-    if (date < threeMonthsFromNow) return { color: "text-orange-600 bg-orange-50", label: "EXPIRING SOON" };
-    return { color: "text-green-600 bg-green-50", label: "GOOD" };
+  const editEmployee = (emp: Employee) => {
+    setIsEditingEmp(emp.id);
+    setEmpData({ name: emp.name, email: emp.email, pass: "", role: emp.role, salary: String(emp.baseSalary || 0) });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  const fireEmployee = async (id: string) => { if(confirm("Deactivate?")) { await axios.delete(`${API_URL}/auth/users/${id}`, getHeader()); loadData(user?.role||""); } };
+  
+  // Pharmacist Actions
+  const addToCart = (p: Product) => {
+    const existing = cart.find(c => c.sku === p.sku);
+    if(existing) { setCart(cart.map(c => c.sku === p.sku ? {...c, qty: c.qty + 1} : c)); } 
+    else { setCart([...cart, { sku: p.sku, name: p.name, qty: 1 }]); }
+  };
+  const updateCart = (targetCart: CartItem[], setCartFunc: any, sku: string, delta: number) => {
+    const existing = targetCart.find(c => c.sku === sku);
+    if (!existing) return;
+    const newQty = existing.qty + delta;
+    if (newQty <= 0) setCartFunc(targetCart.filter(c => c.sku !== sku));
+    else setCartFunc(targetCart.map(c => c.sku === sku ? {...c, qty: newQty} : c));
+  };
+  const removeCartItem = (targetCart: CartItem[], setCartFunc: any, sku: string) => setCartFunc(targetCart.filter(c => c.sku !== sku));
+
+  const checkout = async () => {
+    try { for (const item of cart) { await axios.post(`${API_URL}/inventory/sell`, { sku: item.sku, qty: item.qty }, getHeader()); } alert("Sold!"); setCart([]); loadData(user?.role||""); } catch (e: any) { alert("Error: " + e.response?.data?.message); }
+  };
+  const handleLogout = () => { localStorage.clear(); router.push("/login"); };
+
+  if (!user) return <div className="p-10">Loading ERP...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-100 font-sans text-gray-800">
-      
-      {/* Top Navbar */}
-      <nav className="bg-slate-900 text-white p-4 shadow-md sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <Activity className="text-green-400" />
-            <div>
-              <h1 className="text-xl font-bold tracking-wide">PharmaCore</h1>
-              <p className="text-xs text-slate-400">Enterprise Inventory System</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-6">
-            {/* HR WIDGET */}
-            <div className="bg-slate-800 rounded-lg p-1 px-3 flex items-center gap-3 border border-slate-700">
-              <div className="flex flex-col items-end">
-                <span className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">
-                  Employee Status
-                </span>
-                <span className={`text-sm font-bold ${hrStatus.isWorking ? "text-green-400" : "text-slate-500"}`}>
-                  {hrStatus.isWorking ? "● ON DUTY" : "○ OFF DUTY"}
-                </span>
-              </div>
-              <button 
-                onClick={toggleShift}
-                disabled={hrLoading}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-md font-bold text-xs transition ${
-                  hrStatus.isWorking ? "bg-red-600 hover:bg-red-700 text-white" : "bg-green-600 hover:bg-green-700 text-white"
-                }`}
-              >
-                {hrStatus.isWorking ? <StopCircle className="w-4 h-4"/> : <PlayCircle className="w-4 h-4"/>}
-                {hrStatus.isWorking ? "Clock Out" : "Clock In"}
-              </button>
-            </div>
-
-            <div className="h-8 w-px bg-slate-700"></div>
-
-            <button onClick={handleLogout} className="flex items-center gap-2 hover:text-red-400 text-xs font-bold transition">
-              <LogOut className="w-4 h-4" /> Logout
-            </button>
-          </div>
+    <div className="min-h-screen bg-gray-50 font-sans text-gray-800">
+      <nav className="bg-slate-900 text-white p-4 flex justify-between items-center sticky top-0 z-50">
+        <div><h1 className="text-xl font-bold">PharmaCore</h1><p className="text-xs text-slate-400">{user.role}</p></div>
+        <div className="flex gap-4">
+          <button onClick={fetchMyProfile} className="flex items-center gap-2 text-sm bg-slate-800 px-3 py-1 rounded hover:bg-slate-700"><UserIcon className="w-4 h-4"/> My Profile</button>
+          <button onClick={handleLogout} className="text-xs bg-red-600 px-3 py-1 rounded font-bold hover:bg-red-700 flex gap-2 items-center"><LogOut className="w-3 h-3"/> Logout</button>
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* LEFT COLUMN */}
-        <div className="lg:col-span-2 space-y-6">
-          
-          {/* ANALYTICS CHART */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-            <h2 className="text-lg font-bold text-slate-700 mb-4 flex items-center gap-2">
-              <Activity className="w-5 h-5 text-blue-500"/> Sales Trend (Last 7 Days)
-            </h2>
-            <div className="h-48 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats}>
-                  <XAxis 
-                    dataKey="date" 
-                    tickFormatter={(str) => new Date(str).toLocaleDateString(undefined, {weekday: 'short'})} 
-                    tick={{fontSize: 12}}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip 
-                    contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
-                  />
-                  <Bar dataKey="total" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={40} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+      {/* FULL PROFILE MODAL */}
+      {showProfile && myProfileData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-xl shadow-2xl w-96 relative animate-in fade-in zoom-in duration-200">
+             <button onClick={() => setShowProfile(false)} className="absolute top-4 right-4 text-slate-400 hover:text-black"><XCircle/></button>
+             <h2 className="text-xl font-bold mb-4 flex gap-2 items-center text-slate-700"><UserIcon className="w-6 h-6 text-blue-600"/> My Full Profile</h2>
+             <div className="space-y-4 text-sm">
+               <div className="bg-slate-50 p-3 rounded border">
+                 <div className="grid grid-cols-2 gap-4">
+                    <div><p className="text-xs text-slate-400 uppercase">Name</p><p className="font-bold">{myProfileData.name}</p></div>
+                    <div><p className="text-xs text-slate-400 uppercase">Role</p><p className="font-bold">{myProfileData.role}</p></div>
+                    <div className="col-span-2"><p className="text-xs text-slate-400 uppercase">Email</p><p className="font-mono">{myProfileData.email}</p></div>
+                    <div><p className="text-xs text-slate-400 uppercase">Hired On</p><p>{new Date(myProfileData.joinDate).toLocaleDateString()}</p></div>
+                    <div><p className="text-xs text-slate-400 uppercase">Base Salary</p><p className="font-bold text-green-600">${myProfileData.baseSalary}</p></div>
+                 </div>
+               </div>
+               <div className="bg-green-50 p-3 rounded border border-green-100">
+                  <p className="text-xs text-green-700 uppercase">Performance (Total Sales)</p>
+                  <p className="text-2xl font-bold text-green-600">${performers.find(p => p.email === myProfileData.email)?.totalSales || 0}</p>
+               </div>
+             </div>
           </div>
-
-          {/* INVENTORY HEADER */}
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold flex items-center gap-2 text-slate-700">
-              <Package className="w-5 h-5" /> Current Stock
-            </h2>
-            
-            <div className="flex items-center gap-3">
-              {/* NEW DOWNLOAD BUTTON */}
-              <button 
-                onClick={handleDownloadReport}
-                disabled={downloading}
-                className="flex items-center gap-2 text-sm text-slate-600 bg-white border border-slate-300 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition"
-              >
-                {downloading ? <RefreshCw className="w-4 h-4 animate-spin"/> : <FileText className="w-4 h-4 text-blue-500"/>}
-                Export Report
-              </button>
-
-              <button onClick={() => { fetchInventory(); fetchHistory(); fetchStats(); }} title="Refresh">
-                 <RefreshCw className="w-5 h-5 text-slate-400 hover:text-blue-600 transition" />
-              </button>
-            </div>
-          </div>
-
-          {/* INVENTORY LIST */}
-          {loading ? (
-            <div className="h-64 flex items-center justify-center text-slate-400">Loading inventory...</div>
-          ) : (
-            products.map((product) => {
-              const totalStock = product.batches.reduce((sum, b) => sum + b.quantity, 0);
-              const isLowStock = totalStock < 10;
-              return (
-                <div key={product.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition">
-                  <div className="p-6 border-b border-slate-100 flex justify-between items-start">
-                    <div>
-                      <h3 className="text-2xl font-bold text-slate-800">{product.name}</h3>
-                      <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded mt-1 inline-block">SKU: {product.sku}</span>
-                    </div>
-                    <div className="text-right">
-                      <div className={`text-4xl font-bold ${isLowStock ? "text-red-500" : "text-blue-600"}`}>{totalStock}</div>
-                      <p className="text-xs uppercase font-bold text-slate-400 tracking-wider">Total Units</p>
-                    </div>
-                  </div>
-                  <div className="bg-slate-50 p-4">
-                    <div className="space-y-2">
-                      {product.batches.map((batch) => {
-                         const status = getExpiryStatus(batch.expiryDate);
-                         return (
-                          <div key={batch.id} className={`flex justify-between items-center text-sm bg-white p-3 rounded border ${batch.quantity === 0 ? 'opacity-50 dashed border-slate-300' : 'border-slate-200'}`}>
-                            <span className="font-mono font-bold text-slate-700">{batch.batchNumber}</span>
-                            <span className={`text-xs font-bold px-2 py-1 rounded ${status.color}`}>
-                              {new Date(batch.expiryDate).toLocaleDateString()} ({status.label})
-                            </span>
-                            <span className="text-xs text-slate-400">Qty: {batch.quantity}</span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                  <div className="p-4 bg-white flex items-center gap-3">
-                    
-                    <button 
-                      onClick={() => handleRestock(product.id)}
-                      className="bg-green-100 text-green-700 px-3 py-2 rounded-lg font-bold hover:bg-green-200 transition text-xs flex items-center gap-1"
-                      title="Add Stock"
-                    >
-                      <PlusCircle className="w-3 h-3"/> Add
-                    </button>
-
-                    <input 
-                      type="number" 
-                      placeholder="Qty" 
-                      className="border border-slate-300 rounded-lg px-4 py-2 w-24 focus:ring-2 focus:ring-blue-500 outline-none transition"
-                      value={sellQty[product.sku] || ""}
-                      onChange={(e) => setSellQty({...sellQty, [product.sku]: e.target.value})}
-                    />
-                    <button 
-                      onClick={() => handleSell(product.sku, product.name)}
-                      disabled={processing || totalStock === 0}
-                      className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                      {processing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ShoppingCart className="w-4 h-4" />}
-                      Process FIFO Sale
-                    </button>
-                  </div>
-                </div>
-              );
-            })
-          )}
         </div>
+      )}
 
-        {/* RIGHT COLUMN: History Log */}
-        <div className="space-y-6">
-          <h2 className="text-xl font-bold flex items-center gap-2 text-slate-700">
-            <History className="w-5 h-5" /> Recent Activity
-          </h2>
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 h-[600px] overflow-y-auto">
-            {logs.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-2 opacity-50">
-                <AlertCircle className="w-8 h-8" />
-                <p>No transactions found</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {logs.map(log => (
-                  <div key={log.id} className="flex gap-3 items-start border-l-2 border-green-500 pl-3 py-2 bg-slate-50 rounded-r">
-                    <CheckCircle2 className="w-4 h-4 text-green-500 mt-1 shrink-0" />
-                    <div className="w-full">
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-[10px] font-mono text-slate-400 uppercase">
-                          {new Date(log.createdAt).toLocaleTimeString()}
-                        </span>
-                        <span className="text-[10px] bg-white border px-1 rounded text-slate-400">
-                          #{log.id.slice(0,4)}
-                        </span>
-                      </div>
-                      
-                      {log.items.map((item, idx) => (
-                        <div key={idx} className="text-sm text-slate-700">
-                          <span className="font-bold">Sold {item.quantity}x</span> {item.batch.product.name}
-                          <div className="text-xs text-slate-500">
-                            (Batch: {item.batch.batchNumber})
-                          </div>
-                        </div>
-                      ))}
+      <main className="max-w-7xl mx-auto p-6">
+        
+        {/* --- 1. PHARMACIST VIEW --- */}
+        {user.role === 'PHARMACIST' && (
+          <div className="grid grid-cols-3 gap-6">
+            <div className="col-span-2 bg-white p-4 rounded shadow">
+              <div className="flex justify-between mb-4"><h2 className="font-bold flex gap-2"><Search className="w-5 h-5"/> Product Catalog</h2><input placeholder="Search..." className="border rounded px-2 text-sm" onChange={e => setSearchTerm(e.target.value)} /></div>
+              <table className="w-full text-sm text-left">
+                <thead className="bg-slate-100 text-slate-600"><tr><th className="p-2">Name</th><th className="p-2">SKU</th><th className="p-2">Stock</th><th className="p-2">Action</th></tr></thead>
+                <tbody>
+                  {products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())).map(p => {
+                    const stock = getStock(p, 'STORE');
+                    return (
+                      <tr key={p.id} className="border-b hover:bg-slate-50">
+                        <td className="p-2 font-bold">{p.name}</td><td className="p-2 font-mono text-slate-500">{p.sku}</td>
+                        <td className={`p-2 font-bold ${stock>0?'text-green-600':'text-red-500'}`}>{stock}</td>
+                        <td className="p-2"><button disabled={stock<=0} onClick={() => addToCart(p)} className="bg-blue-600 text-white px-2 py-1 rounded text-xs disabled:opacity-50">Add</button></td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="bg-white p-4 rounded shadow flex flex-col h-96">
+              <h2 className="font-bold mb-4 flex gap-2"><ShoppingCart className="w-5 h-5"/> Sale Cart</h2>
+              <div className="flex-1 overflow-y-auto space-y-2">
+                {cart.map((item, i) => (
+                  <div key={i} className="flex justify-between items-center text-sm border-b pb-2">
+                    <div><div>{item.name}</div><div className="text-xs text-slate-400">{item.sku}</div></div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => updateCart(cart, setCart, item.sku, -1)} className="bg-slate-200 p-1 rounded hover:bg-slate-300"><Minus className="w-3 h-3"/></button>
+                      <span className="font-bold w-4 text-center">{item.qty}</span>
+                      <button onClick={() => updateCart(cart, setCart, item.sku, 1)} className="bg-slate-200 p-1 rounded hover:bg-slate-300"><Plus className="w-3 h-3"/></button>
+                      <button onClick={() => removeCartItem(cart, setCart, item.sku)} className="text-red-500 hover:text-red-700 ml-2"><Trash2 className="w-4 h-4"/></button>
                     </div>
                   </div>
                 ))}
               </div>
-            )}
+              <button onClick={checkout} disabled={cart.length===0} className="w-full bg-green-600 text-white py-2 rounded font-bold hover:bg-green-700 mt-4">Checkout</button>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* --- 2. STORE MANAGER VIEW --- */}
+        {user.role === 'STORE_MANAGER' && (
+          <div className="space-y-6">
+            <div className="bg-white p-4 rounded shadow grid grid-cols-2 gap-6">
+               <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                  <h3 className="text-xs font-bold text-slate-500 uppercase mb-2">1. Define Medicine</h3>
+                  <div className="flex gap-2 mb-2"><input value={prodData.name} onChange={e=>setProdData({...prodData, name: e.target.value})} placeholder="Name (e.g. Ibuprofen)" className="border p-1 w-full text-sm rounded"/><input value={prodData.sku} onChange={e=>setProdData({...prodData, sku: e.target.value})} placeholder="SKU (e.g. IBU-200)" className="border p-1 w-full text-sm rounded"/></div>
+                  <button onClick={handleCreateProduct} className="bg-slate-700 text-white w-full py-1 text-xs font-bold rounded">Create</button>
+               </div>
+               <div>
+                  <h3 className="font-bold mb-2 flex gap-2"><Truck className="w-4 h-4"/> 2. Receive Stock</h3>
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <select className="col-span-2 border p-1 text-sm rounded" onChange={e => setReceiveData({...receiveData, sku: e.target.value})}><option value="">Select Product...</option>{products.map(p => <option key={p.id} value={p.sku}>{p.name}</option>)}</select>
+                    <input placeholder="Batch #" className="border p-1 text-sm" onChange={e=>setReceiveData({...receiveData, batch: e.target.value})}/><input type="date" className="border p-1 text-sm" onChange={e=>setReceiveData({...receiveData, expiry: e.target.value})}/>
+                    <input placeholder="Qty" type="number" className="border p-1 text-sm" onChange={e=>setReceiveData({...receiveData, qty: e.target.value})}/><input placeholder="Cost" type="number" className="border p-1 text-sm" onChange={e=>setReceiveData({...receiveData, cost: e.target.value})}/>
+                  </div>
+                  <button onClick={receiveStock} className="bg-green-600 text-white w-full py-1 rounded text-sm font-bold">Receive</button>
+               </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-6">
+              <div className="col-span-2 bg-white p-4 rounded shadow">
+                <h2 className="font-bold mb-4">Warehouse Inventory</h2>
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-slate-800 text-white"><tr><th className="p-2">Product</th><th className="p-2">Whse Qty</th><th className="p-2">Transfer Qty</th><th className="p-2">Action</th></tr></thead>
+                  <tbody>
+                    {products.map(p => {
+                       const whStock = getStock(p, 'WAREHOUSE');
+                       const isExpanded = expandedProduct === p.id;
+                       return (
+                         <Fragment key={p.id}>
+                           <tr className="border-b bg-white">
+                             <td className="p-2">
+                               <div className="font-bold">{p.name} <span className="text-xs font-normal text-slate-500">({p.sku})</span></div>
+                               <button onClick={() => setExpandedProduct(isExpanded ? null : p.id)} className="text-blue-500 text-xs flex items-center gap-1 mt-1 hover:underline"><Eye className="w-3 h-3"/> {isExpanded ? 'Hide' : 'View'} Batches</button>
+                             </td>
+                             <td className="p-2 font-bold text-blue-600">{whStock}</td>
+                             <td className="p-2"><input type="number" placeholder="0" className="border w-16 px-1" value={transferInputs[p.sku]||""} onChange={e=>setTransferInputs({...transferInputs, [p.sku]: e.target.value})}/></td>
+                             <td className="p-2"><button onClick={() => addToTransferCart(p)} className="text-blue-600 font-bold text-xs"><ArrowRight/></button></td>
+                           </tr>
+                           {isExpanded && (
+                             <tr className="bg-slate-50"><td colSpan={4} className="p-3"><div className="grid grid-cols-3 gap-2 text-xs">{p.batches.filter(b => b.location.type === 'WAREHOUSE').map(b => (<div key={b.id} className="bg-white border p-2 rounded flex justify-between"><span>{b.batchNumber}</span><span className="text-slate-500">Exp: {new Date(b.expiryDate).toLocaleDateString()}</span><span className="font-bold text-green-600">${b.costPrice}</span></div>))}</div></td></tr>
+                           )}
+                         </Fragment>
+                       )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div className="bg-white p-4 rounded shadow flex flex-col">
+                <h2 className="font-bold mb-4 flex gap-2"><Store className="w-5 h-5"/> Transfer Cart</h2>
+                <div className="flex-1 bg-slate-50 p-2 rounded mb-4 overflow-y-auto space-y-2">
+                   {transferCart.map((item, i) => (
+                       <div key={i} className="flex justify-between items-center text-sm border-b pb-1">
+                         <div>{item.name}</div>
+                         <div className="flex items-center gap-1">
+                           <button onClick={() => updateCart(transferCart, setTransferCart, item.sku, -1)} className="bg-slate-200 p-1 rounded hover:bg-slate-300"><Minus className="w-3 h-3"/></button>
+                           <span className="font-bold w-4 text-center">{item.qty}</span>
+                           <button onClick={() => updateCart(transferCart, setTransferCart, item.sku, 1)} className="bg-slate-200 p-1 rounded hover:bg-slate-300"><Plus className="w-3 h-3"/></button>
+                           <button onClick={() => removeCartItem(transferCart, setTransferCart, item.sku)} className="text-red-500 hover:text-red-700 ml-2"><Trash2 className="w-4 h-4"/></button>
+                         </div>
+                       </div>
+                   ))}
+                </div>
+                <button onClick={confirmTransfer} disabled={transferCart.length===0} className="w-full bg-blue-600 text-white py-2 rounded font-bold hover:bg-blue-700">Approve All</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- 3. HR & ADMIN VIEW --- */}
+        {(user.role === 'HR_MANAGER' || user.role === 'SUPER_ADMIN') && (
+          <div className="space-y-6">
+            
+            {/* Performance Leaderboard for HR */}
+            {user.role === 'HR_MANAGER' && (
+              <div className="bg-white p-4 rounded shadow">
+                <h2 className="font-bold mb-4 flex gap-2"><Trophy className="w-5 h-5 text-yellow-500"/> Performance Leaderboard</h2>
+                <div className="grid grid-cols-2 gap-4">
+                  {performers.length > 0 ? performers.map((p, i) => (
+                    <div key={i} className="flex justify-between p-3 bg-slate-50 rounded border">
+                      <span className="font-bold">#{i+1} {p.name}</span>
+                      <span className="text-green-600 font-bold">${p.totalSales}</span>
+                    </div>
+                  )) : <p className="text-slate-400">No sales recorded.</p>}
+                </div>
+              </div>
+            )}
+
+            <div className="bg-white p-4 rounded shadow">
+              <h2 className="font-bold mb-4 flex gap-2"><UserPlus className="w-5 h-5"/> {isEditingEmp ? 'Edit Contract' : 'Hire / Create User'}</h2>
+              <div className="flex gap-2">
+                <input placeholder="Name" value={empData.name} className="border p-2 w-full text-sm" onChange={e=>setEmpData({...empData, name: e.target.value})}/>
+                <input placeholder="Email" value={empData.email} disabled={!!isEditingEmp} className={`border p-2 w-full text-sm ${isEditingEmp ? 'bg-slate-100' : ''}`} onChange={e=>setEmpData({...empData, email: e.target.value})}/>
+                {!isEditingEmp && <input placeholder="Pass" type="password" value={empData.pass} className="border p-2 w-full text-sm" onChange={e=>setEmpData({...empData, pass: e.target.value})}/>}
+                <select value={empData.role} className="border p-2 w-full text-sm" onChange={e=>setEmpData({...empData, role: e.target.value})}>
+                  <option value="PHARMACIST">Pharmacist</option><option value="STORE_MANAGER">Store Mgr</option><option value="HR_MANAGER">HR Mgr</option>
+                </select>
+                {user.role === 'HR_MANAGER' && <input placeholder="Salary $" value={empData.salary} className="border p-2 w-24 text-sm" onChange={e=>setEmpData({...empData, salary: e.target.value})}/>}
+                
+                <button onClick={saveEmployee} className={`px-4 rounded font-bold text-white ${isEditingEmp ? 'bg-orange-500 hover:bg-orange-600' : 'bg-purple-600 hover:bg-purple-700'}`}>
+                  {isEditingEmp ? 'Update' : 'Add'}
+                </button>
+                {isEditingEmp && <button onClick={() => { setIsEditingEmp(null); setEmpData({ name: "", email: "", pass: "", role: "PHARMACIST", salary: "0" }); }} className="text-slate-500 text-xs underline">Cancel</button>}
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded shadow">
+              <h2 className="font-bold mb-4 flex gap-2"><Users className="w-5 h-5"/> Staff Directory</h2>
+              <table className="w-full text-sm text-left">
+                <thead className="bg-slate-100 text-slate-600"><tr><th className="p-2">Name</th><th className="p-2">Status</th><th className="p-2">Role</th><th className="p-2">Email</th>{user.role==='HR_MANAGER' && <th className="p-2">Salary</th>}<th className="p-2">Action</th></tr></thead>
+                <tbody>
+                  {employees.map(emp => (
+                    <tr key={emp.id} className={`border-b ${!emp.isActive ? 'bg-red-50 opacity-75' : ''}`}>
+                      <td className="p-2 font-bold">{emp.name}</td>
+                      <td className="p-2">{emp.isActive ? <span className="text-green-600 text-xs font-bold">Active</span> : <span className="text-red-600 text-xs font-bold">Terminated</span>}</td>
+                      <td className="p-2"><span className="bg-slate-200 px-2 py-1 rounded text-xs">{emp.role}</span></td>
+                      <td className="p-2 text-slate-500">{emp.email}</td>
+                      {user.role==='HR_MANAGER' && <td className="p-2 font-mono">${emp.baseSalary}</td>}
+                      <td className="p-2 flex gap-2">
+                        {user.role==='HR_MANAGER' && emp.isActive && <button onClick={()=>editEmployee(emp)} className="text-blue-600 hover:text-blue-800 flex gap-1 items-center"><Edit2 className="w-4 h-4"/> Edit</button>}
+                        {emp.isActive && <button onClick={()=>fireEmployee(emp.id)} className="text-red-600 hover:text-red-800 flex gap-1 items-center"><Trash2 className="w-4 h-4"/> Fire</button>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
       </main>
     </div>

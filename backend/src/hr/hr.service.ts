@@ -50,4 +50,41 @@ export class HrService {
       data: { checkOut: new Date() }
     });
   }
+
+
+  // 4. GET SALES PERFORMANCE (Leaderboard)
+  async getPerformanceStats() {
+    // A. Group Sales by User ID and Sum the Totals
+    const salesGrouped = await this.prisma.sale.groupBy({
+      by: ['userId'],
+      _sum: {
+        totalAmount: true,
+      },
+      orderBy: {
+        _sum: {
+          totalAmount: 'desc', // Highest sales first
+        },
+      },
+    });
+
+    // B. Get User Names (Because groupBy only gives us IDs)
+    // This is a manual "Join" because Prisma groupBy doesn't support relations easily yet
+    const leaderBoard = await Promise.all(
+      salesGrouped.map(async (entry) => {
+        const user = await this.prisma.user.findUnique({
+          where: { id: entry.userId },
+          select: { name: true, email: true }
+        });
+
+        return {
+          name: user?.name || 'Unknown',
+          email: user?.email,
+          totalSales: entry._sum.totalAmount || 0,
+        };
+      })
+    );
+
+    return leaderBoard;
+  }
+
 }
