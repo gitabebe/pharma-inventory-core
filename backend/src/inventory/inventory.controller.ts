@@ -1,4 +1,5 @@
-import { Controller, Post, Body, Get, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Get, Res, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { InventoryService } from './inventory.service';
 import { PrismaClient } from '@prisma/client';
@@ -48,8 +49,21 @@ export class InventoryController {
     return this.inventoryService.getWeeklyStats();
   }
 
+   @UseGuards(AuthGuard('jwt'))
+  @Get('report')
+  async downloadReport(@Res() res: Response) {
+    const buffer = await this.inventoryService.generateReport();
 
-  // 4. View All Stock
+    // Tell the browser: "This is a PDF file, please download it"
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': 'attachment; filename=pharmacore-report.pdf',
+    });
+
+    buffer.pipe(res);
+  }
+
+
   //@UseGuards(AuthGuard('jwt'))
   @Get()
   async getStock() {

@@ -1,8 +1,61 @@
+import PDFDocument = require('pdfkit');
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service'; // Use the injected service
 
 @Injectable()
 export class InventoryService {
+
+  // GENERATE PDF STREAM
+  async generateReport() {
+    const doc = new PDFDocument();
+    
+    // 1. Fetch Data (Last 20 Sales)
+    const sales = await this.prisma.sale.findMany({
+      take: 20,
+      orderBy: { createdAt: 'desc' },
+      include: { items: { include: { batch: { include: { product: true } } } } }
+    });
+
+    // 2. Draw Header
+    doc.fontSize(20).text('PharmaCore Sales Report', { align: 'center' });
+    doc.moveDown();
+    doc.fontSize(12).text(`Generated Date: ${new Date().toLocaleDateString()}`, { align: 'center' });
+    doc.moveDown();
+    doc.text('-----------------------------------------------------------', { align: 'center' });
+    doc.moveDown();
+
+    // 3. Draw Table Headers
+    doc.fontSize(10).font('Helvetica-Bold');
+    doc.text('Time', 50, doc.y, { continued: true });
+    doc.text('Product', 150, doc.y, { continued: true });
+    doc.text('Batch', 350, doc.y, { continued: true });
+    doc.text('Qty', 450, doc.y);
+    doc.moveDown(0.5);
+    doc.font('Helvetica'); // Reset font
+
+    // 4. Loop through sales and draw rows
+    sales.forEach(sale => {
+      sale.items.forEach(item => {
+        const y = doc.y;
+        
+        // Draw the row
+        doc.text(sale.createdAt.toISOString().split('T')[0], 50, y, { width: 90, continued: true });
+        doc.text(item.batch.product.name, 150, y, { width: 190, continued: true });
+        doc.text(item.batch.batchNumber, 350, y, { width: 90, continued: true });
+        doc.text(item.quantity.toString(), 450, y);
+        
+        doc.moveDown(0.5); // Add spacing
+      });
+      // Add a separator line between different sale events
+      doc.moveTo(50, doc.y).lineTo(500, doc.y).strokeColor('#eeeeee').stroke();
+      doc.moveDown(0.5);
+    });
+
+    // 5. Finalize PDF file
+    doc.end();
+
+    return doc; // Return the stream
+  }
 
   // Get Sales for the last 7 days
   async getWeeklyStats() {

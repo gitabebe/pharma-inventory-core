@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { useRouter } from "next/navigation"; 
 import { 
-  Package, ShoppingCart, RefreshCw, Activity, CheckCircle2, History, LogOut, AlertCircle, PlayCircle, StopCircle, PlusCircle
+  Package, ShoppingCart, RefreshCw, Activity, CheckCircle2, History, LogOut, AlertCircle, PlayCircle, StopCircle, PlusCircle, FileText
 } from "lucide-react";
 // Import Recharts
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
@@ -24,6 +24,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [sellQty, setSellQty] = useState<Record<string, string>>({});
   const [processing, setProcessing] = useState(false);
+  const [downloading, setDownloading] = useState(false); // New state for PDF button
   
   // HR State
   const [hrStatus, setHrStatus] = useState<HrStatus>({ isWorking: false });
@@ -105,12 +106,11 @@ export default function Dashboard() {
     router.push("/login");
   };
 
-  // --- Quick Restock Function (NEW) ---
+  // --- Quick Restock Function ---
   const handleRestock = async (productId: string) => {
     const token = localStorage.getItem("token");
     if (!token) return;
 
-    // Ask user for quantity (optional, defaults to 50 if they cancel/empty)
     const qtyStr = prompt("How many units to add?", "50");
     if (!qtyStr) return;
     const qty = parseInt(qtyStr);
@@ -118,16 +118,47 @@ export default function Dashboard() {
     try {
       await axios.post(`${API_URL}/inventory/batch`, {
         productId: productId,
-        batchNumber: "BATCH-" + Math.floor(Math.random() * 10000), // Random ID
-        expiry: "2026-06-01", // Fresh stock date
+        batchNumber: "BATCH-" + Math.floor(Math.random() * 10000), 
+        expiry: "2026-06-01", 
         qty: qty 
       }, getAuthHeader());
       
       alert(`Restocked ${qty} units!`);
-      fetchInventory(); // Update UI
+      fetchInventory(); 
     } catch (error) {
       console.error(error);
       alert("Restock failed");
+    }
+  };
+
+  // --- NEW: Download PDF Report ---
+  const handleDownloadReport = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    setDownloading(true);
+
+    try {
+      // 1. Request the PDF as a Blob (Binary Data)
+      const response = await axios.get(`${API_URL}/inventory/report`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob', // IMPORTANT: Tells Axios this is a file, not JSON
+      });
+
+      // 2. Create a hidden link to trigger the download
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'pharmacore-report.pdf'); // Filename
+      document.body.appendChild(link);
+      link.click();
+      
+      // 3. Cleanup
+      link.remove();
+    } catch (error) {
+      console.error("Download failed", error);
+      alert("Failed to download report");
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -236,9 +267,22 @@ export default function Dashboard() {
             <h2 className="text-xl font-bold flex items-center gap-2 text-slate-700">
               <Package className="w-5 h-5" /> Current Stock
             </h2>
-            <button onClick={() => { fetchInventory(); fetchHistory(); fetchStats(); }} title="Refresh">
-               <RefreshCw className="w-5 h-5 text-slate-400 hover:text-blue-600 transition" />
-            </button>
+            
+            <div className="flex items-center gap-3">
+              {/* NEW DOWNLOAD BUTTON */}
+              <button 
+                onClick={handleDownloadReport}
+                disabled={downloading}
+                className="flex items-center gap-2 text-sm text-slate-600 bg-white border border-slate-300 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition"
+              >
+                {downloading ? <RefreshCw className="w-4 h-4 animate-spin"/> : <FileText className="w-4 h-4 text-blue-500"/>}
+                Export Report
+              </button>
+
+              <button onClick={() => { fetchInventory(); fetchHistory(); fetchStats(); }} title="Refresh">
+                 <RefreshCw className="w-5 h-5 text-slate-400 hover:text-blue-600 transition" />
+              </button>
+            </div>
           </div>
 
           {/* INVENTORY LIST */}
@@ -278,7 +322,6 @@ export default function Dashboard() {
                   </div>
                   <div className="p-4 bg-white flex items-center gap-3">
                     
-                    {/* NEW RESTOCK BUTTON */}
                     <button 
                       onClick={() => handleRestock(product.id)}
                       className="bg-green-100 text-green-700 px-3 py-2 rounded-lg font-bold hover:bg-green-200 transition text-xs flex items-center gap-1"
