@@ -8,7 +8,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState(""); 
   const [pass, setPass] = useState("");
   const [error, setError] = useState("");
-  const [showHelp, setShowHelp] = useState(false); // Toggle for Help Modal
+  const [showHelp, setShowHelp] = useState(false);
   
   const router = useRouter();
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
@@ -27,49 +27,53 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex bg-white">
+    // FIX: Changed 'flex' to 'flex flex-col lg:flex-row' (Stack on mobile, Row on Desktop)
+    <div className="min-h-screen flex flex-col lg:flex-row bg-white">
       
-      {/* --- LEFT SIDE: HERO / LANDING PAGE --- */}
-      <div className="hidden lg:flex w-1/2 bg-slate-900 text-white flex-col justify-center p-12 relative overflow-hidden">
-        {/* Background Decoration */}
+      {/* --- HERO SECTION (TOP on Mobile / LEFT on Desktop) --- */}
+      {/* FIX: Removed 'hidden'. Added 'w-full'. Adjusted padding. */}
+      <div className="w-full lg:w-1/2 bg-slate-900 text-white flex flex-col justify-center p-8 lg:p-12 relative overflow-hidden shrink-0">
         <div className="absolute top-0 left-0 w-full h-full bg-[url('https://images.unsplash.com/photo-1587854692152-cbe660dbde88?q=80&w=2069&auto=format&fit=crop')] bg-cover opacity-10"></div>
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-6">
-            <div className="bg-green-500 p-3 rounded-xl"><Activity className="w-8 h-8 text-white" /></div>
-            <h1 className="text-4xl font-bold tracking-tight">PharmaCore ERP</h1>
+            <div className="bg-green-500 p-2 lg:p-3 rounded-xl"><Activity className="w-6 h-6 lg:w-8 lg:h-8 text-white" /></div>
+            <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">PharmaCore ERP</h1>
           </div>
-          <p className="text-xl text-slate-300 mb-8 max-w-lg leading-relaxed">
+          
+          {/* On mobile, we hide the big text paragraph to save space, show on desktop */}
+          <p className="text-sm lg:text-xl text-slate-300 mb-6 lg:mb-8 max-w-lg leading-relaxed">
             The next-generation Enterprise Resource Planning system designed for modern pharmacy chains.
           </p>
 
-          <div className="space-y-6">
+          <div className="space-y-4 lg:space-y-6">
             <div className="flex items-start gap-4">
-              <ShieldCheck className="w-6 h-6 text-green-400 mt-1"/>
-              <div><h3 className="font-bold text-lg">Role-Based Security</h3><p className="text-slate-400 text-sm">Strict access control for Admins, HR, and Pharmacists.</p></div>
+              <ShieldCheck className="w-5 h-5 lg:w-6 lg:h-6 text-green-400 mt-1"/>
+              <div><h3 className="font-bold text-base lg:text-lg">Role-Based Security</h3><p className="text-slate-400 text-xs lg:text-sm">Strict access control for Admins & HR.</p></div>
             </div>
             <div className="flex items-start gap-4">
-              <BarChart3 className="w-6 h-6 text-blue-400 mt-1"/>
-              <div><h3 className="font-bold text-lg">Advanced Analytics</h3><p className="text-slate-400 text-sm">Real-time sales tracking, inventory forecasting, and PDF reports.</p></div>
+              <BarChart3 className="w-5 h-5 lg:w-6 lg:h-6 text-blue-400 mt-1"/>
+              <div><h3 className="font-bold text-base lg:text-lg">Advanced Analytics</h3><p className="text-slate-400 text-xs lg:text-sm">Real-time sales tracking & forecasting.</p></div>
             </div>
-            <div className="flex items-start gap-4">
-              <Users className="w-6 h-6 text-purple-400 mt-1"/>
-              <div><h3 className="font-bold text-lg">Workforce Management</h3><p className="text-slate-400 text-sm">Complete HR suite for hiring, payroll, and performance tracking.</p></div>
+            {/* Hide 3rd item on very small mobile screens to save vertical space */}
+            <div className="hidden sm:flex items-start gap-4">
+              <Users className="w-5 h-5 lg:w-6 lg:h-6 text-purple-400 mt-1"/>
+              <div><h3 className="font-bold text-base lg:text-lg">Workforce Management</h3><p className="text-slate-400 text-xs lg:text-sm">Complete HR suite for hiring & payroll.</p></div>
             </div>
           </div>
         </div>
-        <p className="relative z-10 mt-12 text-xs text-slate-500">© 2025 PharmaCore Inc. Enterprise Edition v1.0</p>
+        <p className="relative z-10 mt-8 lg:mt-12 text-xs text-slate-500">© 2025 PharmaCore Inc. Enterprise Edition v1.0</p>
       </div>
 
-      {/* --- RIGHT SIDE: LOGIN FORM --- */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-slate-50">
+      {/* --- LOGIN FORM (BOTTOM on Mobile / RIGHT on Desktop) --- */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-8 bg-slate-50 grow">
         <div className="w-full max-w-md">
-          <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100">
-            <div className="mb-8 text-center">
-               <h2 className="text-2xl font-bold text-slate-800">Welcome Back</h2>
+          <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-xl border border-slate-100">
+            <div className="mb-6 lg:mb-8 text-center">
+               <h2 className="text-xl lg:text-2xl font-bold text-slate-800">Welcome Back</h2>
                <p className="text-slate-500 text-sm mt-1">Please sign in to your enterprise dashboard.</p>
             </div>
 
-            <form onSubmit={handleLogin} className="space-y-5">
+            <form onSubmit={handleLogin} className="space-y-4 lg:space-y-5">
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1 uppercase">Email Address</label>
                 <div className="relative">
@@ -99,11 +103,10 @@ export default function LoginPage() {
               </button>
             </div>
           </div>
-          <p className="text-center text-xs text-slate-400 mt-6">Protected by Enterprise Grade Encryption</p>
         </div>
       </div>
 
-      {/* --- HELP MODAL POPUP --- */}
+      {/* --- HELP MODAL (Same as before) --- */}
       {showHelp && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in zoom-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
@@ -132,7 +135,6 @@ export default function LoginPage() {
                    <CheckCircle2 className="w-4 h-4 text-slate-300"/>
                 </div>
               </div>
-              <p className="text-xs text-center text-slate-400 mt-4">Click any row to auto-fill the login form.</p>
             </div>
           </div>
         </div>
