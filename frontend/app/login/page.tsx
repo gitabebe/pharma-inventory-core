@@ -27,50 +27,62 @@ export default function LoginPage() {
   };
 
   return (
-    // FIX: Changed 'flex' to 'flex flex-col lg:flex-row' (Stack on mobile, Row on Desktop)
     <div className="min-h-screen flex flex-col lg:flex-row bg-white">
       
       {/* --- HERO SECTION (TOP on Mobile / LEFT on Desktop) --- */}
-      {/* FIX: Removed 'hidden'. Added 'w-full'. Adjusted padding. */}
-      <div className="w-full lg:w-1/2 bg-slate-900 text-white flex flex-col justify-center p-8 lg:p-12 relative overflow-hidden shrink-0">
-        <div className="absolute top-0 left-0 w-full h-full bg-[url('https://images.unsplash.com/photo-1587854692152-cbe660dbde88?q=80&w=2069&auto=format&fit=crop')] bg-cover opacity-10"></div>
+      {/* FIX: Removed 'overflow-hidden' to prevent cutting off text. Added 'min-h' to ensure space. */}
+      <div className="w-full lg:w-1/2 bg-slate-900 text-white flex flex-col justify-center p-8 lg:p-12 relative shrink-0">
+        {/* Background - Adjusted opacity for readability */}
+        <div className="absolute top-0 left-0 w-full h-full bg-[url('https://images.unsplash.com/photo-1587854692152-cbe660dbde88?q=80&w=2069&auto=format&fit=crop')] bg-cover opacity-10 pointer-events-none"></div>
+        
         <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-6">
+          <div className="flex items-center gap-3 mb-4 lg:mb-6">
             <div className="bg-green-500 p-2 lg:p-3 rounded-xl"><Activity className="w-6 h-6 lg:w-8 lg:h-8 text-white" /></div>
             <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">PharmaCore ERP</h1>
           </div>
           
-          {/* On mobile, we hide the big text paragraph to save space, show on desktop */}
           <p className="text-sm lg:text-xl text-slate-300 mb-6 lg:mb-8 max-w-lg leading-relaxed">
-            The next-generation Enterprise Resource Planning system designed for modern pharmacy chains.
+            Enterprise management system for inventory, sales, and workforce administration.
           </p>
 
-          <div className="space-y-4 lg:space-y-6">
+          <div className="space-y-4 lg:space-y-6 mb-8">
+            {/* UPDATED TEXT: Matches exactly what we built */}
             <div className="flex items-start gap-4">
               <ShieldCheck className="w-5 h-5 lg:w-6 lg:h-6 text-green-400 mt-1"/>
-              <div><h3 className="font-bold text-base lg:text-lg">Role-Based Security</h3><p className="text-slate-400 text-xs lg:text-sm">Strict access control for Admins & HR.</p></div>
+              <div>
+                <h3 className="font-bold text-base lg:text-lg">Role-Based Security</h3>
+                <p className="text-slate-400 text-xs lg:text-sm">Secure access for Admin, HR, Store, & Pharmacist.</p>
+              </div>
             </div>
             <div className="flex items-start gap-4">
               <BarChart3 className="w-5 h-5 lg:w-6 lg:h-6 text-blue-400 mt-1"/>
-              <div><h3 className="font-bold text-base lg:text-lg">Advanced Analytics</h3><p className="text-slate-400 text-xs lg:text-sm">Real-time sales tracking & forecasting.</p></div>
+              <div>
+                <h3 className="font-bold text-base lg:text-lg">Inventory Tracking</h3>
+                <p className="text-slate-400 text-xs lg:text-sm">Batch management, Expiry alerts (FIFO), and Stock Transfers.</p>
+              </div>
             </div>
-            {/* Hide 3rd item on very small mobile screens to save vertical space */}
-            <div className="hidden sm:flex items-start gap-4">
+            {/* Show on all screens now that we fixed the height issues */}
+            <div className="flex items-start gap-4">
               <Users className="w-5 h-5 lg:w-6 lg:h-6 text-purple-400 mt-1"/>
-              <div><h3 className="font-bold text-base lg:text-lg">Workforce Management</h3><p className="text-slate-400 text-xs lg:text-sm">Complete HR suite for hiring & payroll.</p></div>
+              <div>
+                <h3 className="font-bold text-base lg:text-lg">Staff Management</h3>
+                <p className="text-slate-400 text-xs lg:text-sm">Hiring, Soft-Delete (Termination), and Salary profiles.</p>
+              </div>
             </div>
           </div>
         </div>
-        <p className="relative z-10 mt-8 lg:mt-12 text-xs text-slate-500">© 2025 PharmaCore Inc. Enterprise Edition v1.0</p>
+        
+        {/* Copyright - Added padding bottom to prevent cut-off */}
+        <p className="relative z-10 text-xs text-slate-500 mt-auto pt-4">© 2025 PharmaCore Inc. Enterprise Edition v1.0</p>
       </div>
 
-      {/* --- LOGIN FORM (BOTTOM on Mobile / RIGHT on Desktop) --- */}
+      {/* --- LOGIN FORM --- */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-8 bg-slate-50 grow">
         <div className="w-full max-w-md">
           <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-xl border border-slate-100">
             <div className="mb-6 lg:mb-8 text-center">
                <h2 className="text-xl lg:text-2xl font-bold text-slate-800">Welcome Back</h2>
-               <p className="text-slate-500 text-sm mt-1">Please sign in to your enterprise dashboard.</p>
+               <p className="text-slate-500 text-sm mt-1">Please sign in to your dashboard.</p>
             </div>
 
             <form onSubmit={handleLogin} className="space-y-4 lg:space-y-5">
@@ -106,7 +118,7 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* --- HELP MODAL (Same as before) --- */}
+      {/* --- HELP MODAL --- */}
       {showHelp && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in zoom-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
@@ -115,7 +127,7 @@ export default function LoginPage() {
               <button onClick={() => setShowHelp(false)} className="hover:bg-slate-700 p-1 rounded"><X className="w-5 h-5"/></button>
             </div>
             <div className="p-6">
-              <p className="text-sm text-slate-600 mb-4">Use these accounts to test the different roles in the system. The universal password is <span className="font-mono bg-slate-100 px-1 rounded font-bold">123456</span>.</p>
+              <p className="text-sm text-slate-600 mb-4">Use these accounts to test the different roles. Password: <span className="font-mono bg-slate-100 px-1 rounded font-bold">123456</span>.</p>
               
               <div className="space-y-3">
                 <div className="flex items-center justify-between p-3 bg-slate-50 border rounded-lg hover:bg-slate-100 cursor-pointer" onClick={() => {setEmail('admin@pharmacy.com'); setPass('123456'); setShowHelp(false);}}>
