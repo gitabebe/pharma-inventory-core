@@ -1,71 +1,92 @@
-# PharmaCore: Advanced FIFO Inventory Engine
+# PharmaCore Enterprise ERP
 
-A full-stack pharmacy management dashboard designed to solve the critical problem of medication expiry. This system uses a strict **First-In-First-Out (FIFO)** algorithm to ensure that the oldest stock batches are sold before newer ones, reducing inventory waste.
+A full-stack Enterprise Resource Planning (ERP) system for Pharmacy Management. 
+Built with **Next.js** (Frontend), **NestJS** (Backend), and **PostgreSQL** (Database).
 
-![Dashboard Preview](https://via.placeholder.com/1000x500?text=Place+Your+Dashboard+Screenshot+Here)
+## 🌐 Live Demo
+* **App Dashboard:** [https://pharma-inventory-core.vercel.app](https://pharma-inventory-core.vercel.app)
+* **API Documentation:** [https://pharma-inventory-core.onrender.com/api](https://pharma-inventory-core.onrender.com/api)
+
+---
 
 ## 🚀 Key Features
 
-* **FIFO Batch Tracking:** The backend automatically identifies and deducts stock from the batch nearest to expiration.
-* **Real-Time Dashboard:** Next.js frontend updates inventory levels instantly upon sale.
-* **Automated Integrity:** Unit tests verify that inventory calculations are mathematically perfect.
-* **Secure Architecture:** Environment-variable based configuration with Docker-ready setup.
+### 1. Role-Based Access Control (RBAC)
+* **Super Admin:** User management, System audit (No access to Salary/Stock data).
+* **HR Manager:** Hiring/Firing (Soft Delete), Salary Management, Performance Leaderboards.
+* **Store Manager:** Warehouse Inventory, Goods Receipt (GRN), Stock Transfer Approval.
+* **Pharmacist:** POS System, Product Search, Shopping Cart, Sales History.
+
+### 2. Advanced Inventory Logic
+* **Multi-Location Support:** Separate tracking for **Warehouse** vs. **Shop Floor**.
+* **FIFO Logic:** First-In-First-Out sales based on batch expiry dates.
+* **Safety Checks:** Automatic blocking of expired drug sales.
+* **Transfer Workflow:** Warehouse -> Transfer Manifest -> Shop Stock.
+
+### 3. Reporting & Analytics
+* **PDF Generation:** Auto-generated stock and sales reports.
+* **Data Visualization:** Weekly sales trend charts.
+* **Swagger API:** Full OpenAPI documentation available at `/api`.
+
+---
 
 ## 🛠️ Tech Stack
+* **Frontend:** Next.js 14, Tailwind CSS, Lucide Icons, Axios.
+* **Backend:** NestJS, Prisma ORM, Passport JWT, Swagger.
+* **Database:** PostgreSQL (via Render Cloud).
 
-* **Backend:** NestJS (Node.js), TypeScript, Prisma ORM
-* **Frontend:** Next.js 14 (App Router), TailwindCSS, Lucide Icons
-* **Database:** PostgreSQL
-* **Testing:** Jest
+---
 
-## 🧪 How to Run (Local Dev)
+## 🔐 Test Credentials (Live App)
+**Universal Password:** `123456`
 
-**1. Clone the repository**
-\`\`\`bash
-git clone https://github.com/gitabebe/pharma-inventory-core.git
-cd pharma-inventory-core
-\`\`\`
+| Role | Email | Permissions |
+| :--- | :--- | :--- |
+| **Super Admin** | `admin@pharmacy.com` | Create Users, Audit Logs (No Salary View) |
+| **HR Manager** | `hr@pharmacy.com` | Hire/Fire, Edit Salary, View Leaderboard |
+| **Store Manager** | `store@pharmacy.com` | Receive Stock, Approve Transfers, View Warehouse |
+| **Pharmacist** | `pharm@pharmacy.com` | Sell Drugs (POS), View Shop Stock |
 
-**2. Start the Infrastructure (Docker)**
-\`\`\`bash
-docker-compose up -d db
-\`\`\`
+---
 
-**3. Install Dependencies**
-\`\`\`bash
-# Backend
-cd backend && npm install
-npx prisma migrate dev --name init
+## ⚡ Local Development Setup
 
-# Frontend
-cd ../frontend && npm install
-\`\`\`
-
-**4. Run the Stack**
-\`\`\`bash
-# Terminal 1 (Backend)
-cd backend && npm run start:dev
-
-# Terminal 2 (Frontend)
-cd frontend && npm run dev
-\`\`\`
-
-## 🧩 The FIFO Logic (Code Highlight)
-The core business logic resides in `inventory.service.ts`. It performs a transactional split of sales across multiple batches:
-
-\`\`\`typescript
-// Example: Selling 15 units when [Batch A: 10] and [Batch B: 10] exist.
-// Result: Batch A becomes 0, Batch B becomes 5.
-const amountToTake = Math.min(batch.quantity, remainingToSell);
-await tx.batch.update({
-  where: { id: batch.id },
-  data: { quantity: batch.quantity - amountToTake },
-});
-\`\`\`
-
-## ✅ Testing
-This project includes automated unit tests to verify the FIFO logic.
-\`\`\`bash
+### 1. Backend Setup
+```bash
 cd backend
-npm test
-\`\`\`
+npm install
+# Start Database (Ensure Docker is running)
+docker-compose up -d
+# Run Migrations & Seed Data
+npx prisma migrate dev
+npx ts-node prisma/seed.ts
+# Start Server
+npm run start:dev
+```
+
+### 2. Frontend Setup
+```bash
+
+cd frontend
+npm install
+npm run de
+```
+---
+© License
+Private Enterprise Edition. Built for educational portfolio purposes.
+
+### 🚀 How to Push this Update
+
+Run these 3 commands in your **Root Terminal**:
+
+```bash
+# 1. Overwrite the file with the text above (Paste the text into README.md first)
+# Or manually create the file and paste the content.
+
+# 2. Stage the file
+git add README.md
+
+# 3. Commit and Push
+git commit -m "Docs: Updated README with Live Demo links and Test Credentials"
+git push
+```
