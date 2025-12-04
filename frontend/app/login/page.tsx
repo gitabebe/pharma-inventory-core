@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { Lock, User } from "lucide-react";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("admin@pharmacy.com"); // Pre-filled for demo
-  const [pass, setPass] = useState("admin123");
+  const [email, setEmail] = useState(""); 
+  const [pass, setPass] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
