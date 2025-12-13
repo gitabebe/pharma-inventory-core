@@ -69,24 +69,8 @@ npm run start:dev
 
 cd frontend
 npm install
-npm run de
+npm run dev
 ```
 ---
 © License
 Private Enterprise Edition. Built for educational portfolio purposes.
-
-### 🚀 How to Push this Update
-
-Run these 3 commands in your **Root Terminal**:
-
-```bash
-# 1. Overwrite the file with the text above (Paste the text into README.md first)
-# Or manually create the file and paste the content.
-
-# 2. Stage the file
-git add README.md
-
-# 3. Commit and Push
-git commit -m "Docs: Updated README with Live Demo links and Test Credentials"
-git push
-```
