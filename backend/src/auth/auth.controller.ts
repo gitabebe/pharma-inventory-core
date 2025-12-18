@@ -3,15 +3,17 @@ import { AuthService } from './auth.service';
 import { AuthGuard } from '@nestjs/passport';
 import { PrismaService } from '../prisma.service';
 import * as bcrypt from 'bcrypt';
+import { CreateAuthDto } from './dto/create-auth.dto';
 
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService, private prisma: PrismaService) {}
 
   @Post('login')
-  login(@Body() body: { email: string; pass: string }) {
-    return this.authService.login(body.email, body.pass);
-  }
+login(@Body() createAuthDto: CreateAuthDto) { 
+  // Make sure to match the field names in your DTO (usually 'password', not 'pass')
+  return this.authService.login(createAuthDto.email, createAuthDto.password);
+}
 
   // --- 1. GET EMPLOYEES ---
   @UseGuards(AuthGuard('jwt'))
