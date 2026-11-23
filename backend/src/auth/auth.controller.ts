@@ -10,11 +10,15 @@ export class AuthController {
   constructor(private authService: AuthService, private prisma: PrismaService) {}
 
   @Post('login')
-login(@Body() createAuthDto: CreateAuthDto) { 
-  // Make sure to match the field names in your DTO (usually 'password', not 'pass')
-  return this.authService.login(createAuthDto.email, createAuthDto.password);
-}
+  login(@Body() createAuthDto: CreateAuthDto) {
+    return this.authService.login(
+      createAuthDto.email,
+      createAuthDto.pass ?? createAuthDto.password ?? ''
+    );
+  }
 
+
+  
   // --- 1. GET EMPLOYEES ---
   @UseGuards(AuthGuard('jwt'))
   @Get('employees')
